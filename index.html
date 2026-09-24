@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TapReview - Generator & Aktivator Kartu NFC/QR Google Review</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- QRCode JS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML2Canvas for Card Image Download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- HTML5 QR Code Scanner Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0f172a;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .gradient-border {
+            border: 1px solid transparent;
+            background-image: linear-gradient(rgba(30, 41, 59, 0.9), rgba(30, 41, 59, 0.9)), linear-gradient(135deg, #3b82f6, #ec4899, #8b5cf6);
+            background-origin: border-box;
+            background-clip: padding-box, border-box;
+        }
+        /* Printable layout setup */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-card, #printable-card * {
+                visibility: visible;
+            }
+            #printable-card {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                box-shadow: none !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+        .card-perspective {
+            perspective: 1000px;
+        }
+        .card-inner {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card-inner.flipped {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            backface-visibility: hidden;
+        }
+        .card-back {
+            transform: rotateY(180deg);
+        }
+        /* Pulse wave animation for NFC */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.15); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .nfc-pulse {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-md w-full px-4 pointer-events-none"></div>
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-amber-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-wifi text-lg rotate-90"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white flex items-center gap-2">
+                        TapReview <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">ID Aktivator Pro</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Sistem Registrasi & Aktivasi ID Kartu NFC/QR Google Review</p>
+                </div>
+            </div>
+
+            <nav class="flex items-center gap-1.5 sm:gap-3 overflow-x-auto py-2">
+                <button onclick="switchTab('activate-card')" id="nav-activate-card" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 whitespace-nowrap">
+                    <i class="fa-solid fa-qrcode mr-1.5"></i> Scan ID & Aktivasi
+                </button>
+                <button onclick="switchTab('generator')" id="nav-generator" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i> Profil Bisnis & Link
+                </button>
+                <button onclick="switchTab('nfc')" id="nav-nfc" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap">
+                    <i class="fa-solid fa-microchip mr-1.5"></i> Tulis NFC
+                </button>
+                <button onclick="switchTab('designer')" id="nav-designer" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap">
+                    <i class="fa-solid fa-palette mr-1.5"></i> Desain Kartu
+                </button>
+                <button onclick="switchTab('history')" id="nav-history" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap">
+                    <i class="fa-solid fa-id-card mr-1.5"></i> Registri Kartu
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-grow">
+
+        <!-- TAB 0: SCAN & AKTIVASI KARTU DENGAN ID (CARD SCANNER & ACTIVATOR) -->
+        <section id="tab-activate-card" class="space-y-8">
+            <!-- Hero banner -->
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-blue-950/60 p-6 sm:p-8 border border-emerald-500/30">
+                <div class="relative z-10 max-w-3xl">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 mb-3">
+                        <i class="fa-solid fa-bolt text-xs"></i> Mode Aktivasi Kartu Berdasarkan ID Unik
+                    </span>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+                        Pindai / Tap ID Kartu Terlebih Dahulu Sebelum Aktivasi
+                    </h2>
+                    <p class="mt-2 text-slate-300 text-xs sm:text-sm">
+                        Ambil Nomor Unik/UID dari Kartu Fisik dengan <strong>Tap Chip NFC</strong>, <strong>Scan QR Code Kamera</strong>, atau ketik ID Kartu secara manual. Kemudian hubungkan langsung dengan Link Google Review bisnis Anda.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Left Panel: Card Identifier Scanner -->
+                <div class="lg:col-span-6 space-y-6">
+                    <div class="glass-card rounded-2xl p-6 border-emerald-500/20">
+                        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">1</span>
+                            Ambil Nomor Seri / ID Kartu Fisik
+                        </h3>
+
+                        <!-- Scanner Method Selector -->
+                        <div class="grid grid-cols-3 gap-2 mb-5">
+                            <button onclick="setScanMode('nfc')" id="scan-mode-nfc" class="p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-semibold transition-all text-center flex flex-col items-center gap-1">
+                                <i class="fa-solid fa-wifi text-lg rotate-90"></i>
+                                Tap NFC Tag
+                            </button>
+                            <button onclick="setScanMode('qr')" id="scan-mode-qr" class="p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-center flex flex-col items-center gap-1 hover:text-white">
+                                <i class="fa-solid fa-camera text-lg"></i>
+                                Scan Kamera QR
+                            </button>
+                            <button onclick="setScanMode('manual')" id="scan-mode-manual" class="p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-center flex flex-col items-center gap-1 hover:text-white">
+                                <i class="fa-solid fa-keyboard text-lg"></i>
+                                Input ID Manual
+                            </button>
+                        </div>
+
+                        <!-- Scan Mode 1: NFC Tap Reader -->
+                        <div id="scanner-view-nfc" class="p-6 bg-slate-950/80 rounded-2xl border border-slate-800 text-center space-y-4">
+                            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                                <i class="fa-solid fa-wifi text-3xl rotate-90 nfc-pulse"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-white">Dekatkan Kartu / Chip NFC ke HP</h4>
+                                <p class="text-xs text-slate-400 mt-1">Sistem akan secara otomatis membaca Hardware Serial Number (UID) chip NFC Anda.</p>
+                            </div>
+                            <button onclick="scanNfcUid()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-wifi rotate-90"></i> Pindai UID Kartu NFC Sekarang
+                            </button>
+                        </div>
+
+                        <!-- Scan Mode 2: Camera QR Reader -->
+                        <div id="scanner-view-qr" class="hidden space-y-3">
+                            <div class="bg-slate-950 rounded-2xl border border-slate-800 p-3 relative overflow-hidden">
+                                <div id="qr-camera-reader" class="w-full rounded-xl overflow-hidden bg-black min-h-[220px]"></div>
+                                <p class="text-[11px] text-slate-400 text-center mt-2">Arahkan kamera ke QR Code yang tercetak di kartu/standee.</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="startQrScanner()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-video"></i> Buka Kamera Scan
+                                </button>
+                                <button onclick="stopQrScanner()" class="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all">
+                                    Matikan
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Scan Mode 3: Manual Serial Entry -->
+                        <div id="scanner-view-manual" class="hidden space-y-3">
+                            <label class="block text-xs font-medium text-slate-300">Masukkan ID / Nomor Seri Kartu Unik</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="input-manual-card-id" placeholder="Contoh: CARD-NFC-89210 atau 04:A2:89:1B" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-emerald-400 placeholder-slate-600 focus:outline-none focus:border-emerald-500">
+                                <button onclick="applyManualCardId()" class="px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl transition-all">
+                                    Gunakan
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-slate-500">Anda dapat mendefinisikan format ID unik sendiri untuk kartu yang dicetak massal.</p>
+                        </div>
+
+                        <!-- DETECTED CARD ID RESULT CARD -->
+                        <div class="mt-6 pt-5 border-t border-slate-800">
+                            <div class="text-xs text-slate-400 mb-2 font-medium flex items-center justify-between">
+                                <span>Status Deteksi ID Kartu:</span>
+                                <span id="card-status-badge" class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">Belum Ada ID Terdeteksi</span>
+                            </div>
+                            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-bold">
+                                        <i class="fa-solid fa-id-badge text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-[10px] uppercase tracking-wider text-slate-400">Card Serial UID / Token</div>
+                                        <div id="display-card-id" class="text-base font-mono font-bold text-emerald-400">UID-BELUM-DIPINDAI</div>
+                                    </div>
+                                </div>
+                                <button onclick="generateRandomCardId()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-all" title="Generate ID Acak">
+                                    <i class="fa-solid fa-shuffle"></i> Acak ID
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Assign Business & Execute Activation -->
+                <div class="lg:col-span-6 space-y-6">
+                    <div class="glass-card rounded-2xl p-6 border-blue-500/20 flex flex-col justify-between h-full">
+                        <div class="space-y-5">
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <span class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">2</span>
+                                Hubungkan dengan Bisnis & Link Review
+                            </h3>
+
+                            <!-- Select Target Business -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Pilih Bisnis Target untuk Kartu Ini</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="activation-biz-name" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white font-semibold focus:outline-none">
+                                    <button onclick="switchTab('generator')" class="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl transition-all whitespace-nowrap">
+                                        Ubah Bisnis
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Target Google Review URL -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Link Google Review Target</label>
+                                <input type="text" id="activation-biz-url" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-mono text-blue-400 focus:outline-none">
+                            </div>
+
+                            <!-- Activation Status Summary Box -->
+                            <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs">
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Nomor / ID Kartu:</span>
+                                    <span id="summary-card-id" class="font-mono text-emerald-400 font-bold">Belum Didefinisikan</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Nama Bisnis:</span>
+                                    <span id="summary-biz-name" class="text-white font-semibold">Kopi Kenangan Studio</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Tipe Chip NFC:</span>
+                                    <span class="text-slate-300">NTAG213 / NTAG215 / QR Compatible</span>
+                                </div>
+                                <div class="flex justify-between text-slate-400">
+                                    <span>Status Registrasi:</span>
+                                    <span id="summary-card-status" class="text-amber-400 font-medium">Siap Diaktivasi</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Final Activation Actions -->
+                        <div class="pt-6 border-t border-slate-800/80 space-y-3">
+                            <button onclick="executeCardActivation()" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-white rounded-xl text-sm font-bold shadow-xl shadow-emerald-600/20 transition-all flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-circle-check text-base"></i> AKTIFKAN KARTU INI SEKARANG
+                            </button>
+                            <p class="text-[11px] text-slate-400 text-center">
+                                Menghubungkan ID Kartu ke Link Ulasan, menyimpan ke database lokal, dan menulis payload NFC.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 1: GENERATOR PROFIL BISNIS -->
+        <section id="tab-generator" class="space-y-8 hidden">
+            <!-- Hero banner -->
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-900/50 via-slate-900 to-indigo-950/60 p-6 sm:p-10 border border-slate-800">
+                <div class="relative z-10 max-w-2xl">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-4">
+                        <i class="fa-solid fa-star text-xs"></i> Solusi Penilaian Pelanggan Bintang 5
+                    </span>
+                    <h2 class="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+                        Ubah Pengunjung Jadi Ulasan Google Bintang 5
+                    </h2>
+                    <p class="mt-3 text-slate-300 text-sm sm:text-base">
+                        Buat link ulasan langsung Google Review bisnis Anda, generate QR Code resolusi tinggi, dan kunci link tersebut ke kartu NFC sekali tap!
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Input Panel -->
+                <div class="lg:col-span-6 space-y-6">
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-blue-600/30 text-blue-400 flex items-center justify-center text-xs">1</span>
+                            Tentukan Bisnis & Link Google Review
+                        </h3>
+
+                        <!-- Method Tabs -->
+                        <div class="flex border-b border-slate-700/80 mb-5 overflow-x-auto">
+                            <button onclick="setMethod('search')" id="method-search" class="px-4 py-2 border-b-2 border-blue-500 text-blue-400 text-sm font-medium transition-all whitespace-nowrap">
+                                <i class="fa-solid fa-magnifying-glass mr-1.5"></i> Cari Nama Bisnis
+                            </button>
+                            <button onclick="setMethod('placeid')" id="method-placeid" class="px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 text-sm font-medium transition-all whitespace-nowrap">
+                                <i class="fa-solid fa-location-dot mr-1.5"></i> Google Place ID
+                            </button>
+                            <button onclick="setMethod('url')" id="method-url" class="px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 text-sm font-medium transition-all whitespace-nowrap">
+                                <i class="fa-solid fa-link mr-1.5"></i> Paste Link Maps
+                            </button>
+                            <button onclick="setMethod('sample')" id="method-sample" class="px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 text-sm font-medium transition-all whitespace-nowrap">
+                                <i class="fa-solid fa-vial mr-1.5"></i> Contoh Demo
+                            </button>
+                        </div>
+
+                        <!-- Search Business Form -->
+                        <div id="form-search" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Cari Nama Bisnis / Tempat / Toko</label>
+                                <div class="relative flex gap-2">
+                                    <input type="text" id="input-search-biz" onkeydown="if(event.key==='Enter') searchBusinessOnline()" placeholder="Ketik nama bisnis (Contoh: Kopi Nako Bandung, Soto Kudus)" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                    <button onclick="searchBusinessOnline()" class="px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl transition-all flex items-center gap-1.5 shrink-0">
+                                        <i class="fa-solid fa-magnifying-glass"></i> Cari
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-2">
+                                    Pilih bisnis dari hasil pencarian untuk otomatis syncing Nama, Link & Place ID!
+                                </p>
+                            </div>
+                            <div id="search-results-box" class="hidden max-h-48 overflow-y-auto space-y-2 pr-1"></div>
+                        </div>
+
+                        <!-- Place ID Form -->
+                        <div id="form-placeid" class="space-y-4 hidden">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Google Place ID Bisnis Anda</label>
+                                <div class="relative">
+                                    <input type="text" id="input-placeid" oninput="handlePlaceIdInput(this.value)" placeholder="Contoh: ChIJN1t_tDe1xS0RyA3hX431x4s" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                    <button onclick="generateFromPlaceId()" class="absolute right-2 top-2 bottom-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg transition-all">
+                                        Proses
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-2 flex items-center justify-between">
+                                    <span class="flex items-center gap-1.5 text-amber-400">
+                                        <i class="fa-solid fa-wand-magic-sparkles text-xs"></i> Nama bisnis otomatis menyesuaikan Place ID!
+                                    </span>
+                                    <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener" class="text-blue-400 underline hover:text-blue-300 text-[11px]">Cari Place ID</a>
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Direct Link Form -->
+                        <div id="form-url" class="space-y-4 hidden">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">URL Google Review / Share Link Maps</label>
+                                <input type="url" id="input-direct-url" oninput="handleUrlInput(this.value)" placeholder="https://www.google.com/maps/place/Kopi+Kenangan/... atau https://g.page/r/..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <button onclick="generateFromDirectUrl()" class="w-full mt-3 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-xl transition-all">
+                                    Gunakan Link Ini & Ekstrak Nama
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Demo Samples -->
+                        <div id="form-sample" class="space-y-3 hidden">
+                            <label class="block text-xs font-medium text-slate-300">Pilih Contoh Bisnis Demo untuk Uji Coba:</label>
+                            <div class="grid grid-cols-1 gap-2">
+                                <button onclick="loadSampleBusiness('Kopi Kenangan - Senayan', 'ChIJ3Xm8qO3xaS4RDs434mX-f30', 'Kopi Kenangan')" class="text-left p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 flex items-center justify-between transition-all group">
+                                    <div>
+                                        <div class="text-sm font-semibold text-white group-hover:text-blue-400">Kopi Kenangan - Jakarta</div>
+                                        <div class="text-xs text-slate-400">Kedai Kopi & Cafe</div>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-blue-400"></i>
+                                </button>
+                                <button onclick="loadSampleBusiness('Resto Padang Sederhana', 'ChIJu3S-a3X2aI4R93e32b4-X99', 'Restoran Sederhana')" class="text-left p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 flex items-center justify-between transition-all group">
+                                    <div>
+                                        <div class="text-sm font-semibold text-white group-hover:text-blue-400">Restoran Sederhana Padang</div>
+                                        <div class="text-xs text-slate-400">Kuliner & Restoran</div>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-blue-400"></i>
+                                </button>
+                                <button onclick="loadSampleBusiness('Barbershop Barberking', 'ChIJX99834v3aI4Rf44f2b9-A11', 'Barberking')" class="text-left p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 flex items-center justify-between transition-all group">
+                                    <div>
+                                        <div class="text-sm font-semibold text-white group-hover:text-blue-400">Barberking Gentleman Haircut</div>
+                                        <div class="text-xs text-slate-400">Layanan Jasa & Perawatan</div>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-blue-400"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Business Profile Detail -->
+                        <div class="mt-6 pt-5 border-t border-slate-800 space-y-4">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-medium text-slate-400">Nama Bisnis (Akan dicetak di Kartu)</label>
+                                    <span id="auto-sync-badge" class="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 flex items-center gap-1">
+                                        <i class="fa-solid fa-sync text-[9px]"></i> Auto-Sync Active
+                                    </span>
+                                </div>
+                                <input type="text" id="biz-name" value="Kopi Kenangan Studio" oninput="updateCardPreview()" class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Pesan Ajakan Ulasan (Call to Action)</label>
+                                <input type="text" id="biz-subtext" value="Bantu Kami Tumbuh! Tap Kartu / Scan QR untuk Beri Ulasan" oninput="updateCardPreview()" class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                            </div>
+
+                            <!-- Generated URL Preview -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Link Langsung Ulasan Google (Target NFC & QR)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="final-review-url" readonly value="https://search.google.com/local/writereview?placeid=ChIJN1t_tDe1xS0RyA3hX431x4s" class="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-xs text-blue-400 font-mono focus:outline-none">
+                                    <button onclick="copyToClipboard(document.getElementById('final-review-url').value)" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs transition-all flex-shrink-0" title="Salin Link">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                    <a id="btn-test-link" href="#" target="_blank" class="p-2.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-xl text-xs transition-all flex-shrink-0" title="Uji Coba Buka Link">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QR Code & Quick Action Panel -->
+                <div class="lg:col-span-6 space-y-6">
+                    <div class="glass-card rounded-2xl p-6 flex flex-col justify-between h-full">
+                        <div>
+                            <h3 class="text-lg font-bold text-white mb-4 flex items-center justify-between">
+                                <span class="flex items-center gap-2">
+                                    <span class="w-7 h-7 rounded-lg bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-xs font-bold">2</span>
+                                    Hasil QR Code Ulasan
+                                </span>
+                                <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    <i class="fa-solid fa-circle-check text-[10px] mr-1"></i> Siap Pakai
+                                </span>
+                            </h3>
+
+                            <div class="flex flex-col sm:flex-row items-center gap-6 my-4 p-6 bg-slate-950/60 rounded-2xl border border-slate-800/80">
+                                <!-- QR Display Box -->
+                                <div class="bg-white p-4 rounded-2xl shadow-xl flex items-center justify-center relative group min-w-[180px] min-h-[180px]">
+                                    <div id="qrcode-container"></div>
+                                </div>
+
+                                <!-- QR Customization Settings -->
+                                <div class="space-y-3 w-full">
+                                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Kustomisasi Warna QR</h4>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-[11px] text-slate-400 mb-1">Warna Pola (Dark)</label>
+                                            <div class="flex items-center gap-2">
+                                                <input type="color" id="qr-color-dark" value="#000000" onchange="generateQrCode()" class="w-8 h-8 rounded-lg bg-slate-800 border-none cursor-pointer">
+                                                <span class="text-xs font-mono text-slate-300" id="qr-color-dark-hex">#000000</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[11px] text-slate-400 mb-1">Warna Latar (Light)</label>
+                                            <div class="flex items-center gap-2">
+                                                <input type="color" id="qr-color-light" value="#ffffff" onchange="generateQrCode()" class="w-8 h-8 rounded-lg bg-slate-800 border-none cursor-pointer">
+                                                <span class="text-xs font-mono text-slate-300" id="qr-color-light-hex">#ffffff</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="pt-2">
+                                        <button onclick="downloadQrCode()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-2">
+                                            <i class="fa-solid fa-download"></i> Unduh Gambar QR (PNG)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="pt-6 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button onclick="switchTab('activate-card')" class="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-qrcode"></i> Lanjut Aktivasi ID Kartu
+                            </button>
+                            <button onclick="switchTab('designer')" class="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-palette"></i> Desain Kartu & Standee
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: NFC WRITER & ACTIVATOR -->
+        <section id="tab-nfc" class="space-y-8 hidden">
+            <div class="max-w-3xl mx-auto glass-card rounded-3xl p-6 sm:p-10 text-center relative overflow-hidden">
+                <!-- Background glow -->
+                <div class="absolute -top-24 -left-24 w-60 h-60 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-24 -right-24 w-60 h-60 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="relative z-10 space-y-6">
+                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-blue-500/10 border border-blue-500/30 text-blue-400 mb-2">
+                        <i class="fa-solid fa-wifi text-4xl rotate-90 nfc-pulse"></i>
+                    </div>
+
+                    <div>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Aktivasi & Penulisan Kartu NFC</h2>
+                        <p class="text-slate-400 text-sm mt-2 max-w-lg mx-auto">
+                            Tulis link Google Review langsung ke chip NFC (NTAG213, NTAG215, NTAG216, Smart Card, atau Sticker NFC).
+                        </p>
+                    </div>
+
+                    <!-- Target URL Display -->
+                    <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 inline-block text-left max-w-xl w-full">
+                        <div class="text-xs text-slate-400 font-medium mb-1">URL yang akan dituliskannya:</div>
+                        <div id="nfc-target-url" class="text-sm font-mono text-blue-400 truncate">https://search.google.com/local/writereview?placeid=ChIJN1t_tDe1xS0RyA3hX431x4s</div>
+                    </div>
+
+                    <!-- Browser Compatibility Status -->
+                    <div id="nfc-compatibility-box" class="p-4 rounded-2xl text-xs text-left max-w-xl mx-auto bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                        <div class="flex items-start gap-3">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg mt-0.5"></i>
+                            <div>
+                                <span class="font-bold">Informasi Kemampuan Web NFC Browser:</span>
+                                <p id="nfc-status-text" class="mt-1 leading-relaxed">
+                                    Memeriksa ketersediaan modul Web NFC...
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NFC Interactive Actions -->
+                    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                        <button id="btn-write-nfc" onclick="writeNfcTag()" class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/30 transition-all flex items-center justify-center gap-3 text-base">
+                            <i class="fa-solid fa-wifi rotate-90"></i> Tulis ke Kartu NFC Sekarang
+                        </button>
+
+                        <button id="btn-read-nfc" onclick="readNfcTag()" class="w-full sm:w-auto px-6 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-2xl transition-all flex items-center justify-center gap-2 text-sm">
+                            <i class="fa-solid fa-expand"></i> Pindai / Baca NFC
+                        </button>
+                    </div>
+
+                    <!-- NFC Writing Status Modal/Box -->
+                    <div id="nfc-writing-indicator" class="hidden p-6 rounded-2xl bg-blue-950/60 border border-blue-500/50 max-w-xl mx-auto animate-pulse">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-400 mb-3"></i>
+                        <h4 class="text-base font-bold text-white">Mendekatkan Kartu NFC...</h4>
+                        <p class="text-xs text-blue-200 mt-1">Tempelkan kartu atau stiker NFC ke bagian belakang HP Anda sekarang.</p>
+                        <button onclick="cancelNfc()" class="mt-4 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded-lg">Batal</button>
+                    </div>
+
+                    <!-- Alternative NFC Guide for Unsupported Browsers (e.g. iOS Safari) -->
+                    <div class="pt-8 border-t border-slate-800 text-left space-y-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Alternatif Penulisan (iOS / Desktop / Aplikasi Pihak Ke-3):</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-300">
+                            <div class="p-3 bg-slate-950/50 rounded-xl border border-slate-800">
+                                <span class="font-semibold text-white block mb-1"><i class="fa-brands fa-apple text-sm mr-1"></i> Pengguna iPhone / iOS</span>
+                                Gunakan aplikasi gratis <strong class="text-blue-400">NFC Tools</strong> di App Store. Pilih menu <em>Write &gt; Add a record &gt; URL/URI</em> lalu paste link di atas.
+                            </div>
+                            <div class="p-3 bg-slate-950/50 rounded-xl border border-slate-800">
+                                <span class="font-semibold text-white block mb-1"><i class="fa-brands fa-android text-sm mr-1"></i> Chrome Android</span>
+                                Web NFC dapat bekerja langsung tanpa aplikasi tambahan! Cukup klik tombol <strong>Tulis ke Kartu NFC</strong> di atas.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: DESIGNER & PRINT MOCKUP -->
+        <section id="tab-designer" class="space-y-8 hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Controls Side -->
+                <div class="lg:col-span-5 space-y-6">
+                    <div class="glass-card rounded-2xl p-6 space-y-5">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-blue-400"></i> Kustomisasi Desain Kartu
+                        </h3>
+
+                        <!-- Template Picker -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-2">Tema Warna & Style</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setTheme('modern-dark')" class="p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-xs font-medium text-white hover:border-blue-500 focus:ring-2 focus:ring-blue-500 text-center">
+                                    <div class="w-full h-3 rounded bg-slate-900 mb-1 border border-slate-700"></div>
+                                    Dark Minimal
+                                </button>
+                                <button onclick="setTheme('google-white')" class="p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-xs font-medium text-white hover:border-blue-500 focus:ring-2 focus:ring-blue-500 text-center">
+                                    <div class="w-full h-3 rounded bg-white mb-1"></div>
+                                    Clean White
+                                </button>
+                                <button onclick="setTheme('gold-luxury')" class="p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-xs font-medium text-white hover:border-blue-500 focus:ring-2 focus:ring-blue-500 text-center">
+                                    <div class="w-full h-3 rounded bg-gradient-to-r from-amber-500 to-yellow-300 mb-1"></div>
+                                    Gold Luxury
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Layout Type -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-2">Format Media Cetak</label>
+                            <select id="select-format" onchange="updateCardLayout()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                                <option value="cr80">Kartu PVC Ukuran Standard (ID Card / CR80 85x54mm)</option>
+                                <option value="standee">Meja Standee Tent Card (A6 Vertical)</option>
+                                <option value="sticker">Stiker Bulat / Persegi Meja Cafe</option>
+                            </select>
+                        </div>
+
+                        <!-- Star Rating Toggle -->
+                        <div class="flex items-center justify-between pt-2">
+                            <span class="text-xs font-medium text-slate-300">Tampilkan Bintang Ulasan 5★</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-stars" checked onchange="updateCardPreview()" class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Card Flip toggle -->
+                        <div class="pt-4 border-t border-slate-800 flex gap-3">
+                            <button onclick="flipCard()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all">
+                                <i class="fa-solid fa-rotate mr-1"></i> Balik Sisi Kartu (Depan / Belakang)
+                            </button>
+                        </div>
+
+                        <!-- Action Export -->
+                        <div class="pt-4 border-t border-slate-800 space-y-2">
+                            <button onclick="downloadCardImage()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-file-image"></i> Unduh Gambar Kartu High-Res (PNG)
+                            </button>
+                            <button onclick="window.print()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-print"></i> Cetak Langsung (PDF / Printer)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Preview Side -->
+                <div class="lg:col-span-7 flex flex-col items-center justify-center">
+                    <div class="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wider">Pratinjau Kartu / Mockup Cetak</div>
+                    
+                    <div class="card-perspective w-full max-w-md flex justify-center py-4">
+                        <!-- Card Container -->
+                        <div id="printable-card" class="card-inner w-[340px] h-[215px] sm:w-[400px] sm:h-[250px] relative rounded-2xl shadow-2xl transition-all duration-500 border border-slate-700/50 bg-slate-900 text-white overflow-hidden p-6 flex flex-col justify-between">
+                            
+                            <!-- CARD FRONT SIDE -->
+                            <div id="card-front-view" class="card-front absolute inset-0 p-6 flex flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950">
+                                <!-- Top Bar -->
+                                <div class="flex justify-between items-start">
+                                    <div class="flex items-center gap-2">
+                                        <!-- Google G Logo SVG -->
+                                        <svg class="w-6 h-6" viewBox="0 0 24 24">
+                                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                                        </svg>
+                                        <span class="text-xs font-bold tracking-widest uppercase text-slate-300">Google Review</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <i class="fa-solid fa-wifi text-xl text-blue-400 rotate-90"></i>
+                                    </div>
+                                </div>
+
+                                <!-- Center Content -->
+                                <div class="my-auto flex items-center gap-4">
+                                    <div class="bg-white p-2 rounded-xl shadow-lg shrink-0">
+                                        <div id="card-qr-container" class="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center"></div>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <h4 id="preview-biz-name" class="font-extrabold text-base sm:text-lg leading-snug line-clamp-2 text-white">Kopi Kenangan Studio</h4>
+                                        <p id="preview-biz-subtext" class="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">Bantu Kami Tumbuh! Tap Kartu / Scan QR untuk Beri Ulasan</p>
+                                        <div id="preview-stars" class="flex gap-1 text-amber-400 text-xs pt-1">
+                                            <i class="fa-solid fa-star"></i>
+                                            <i class="fa-solid fa-star"></i>
+                                            <i class="fa-solid fa-star"></i>
+                                            <i class="fa-solid fa-star"></i>
+                                            <i class="fa-solid fa-star"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Footer Tag -->
+                                <div class="flex justify-between items-center text-[10px] text-slate-400 border-t border-slate-800/80 pt-2">
+                                    <span>TAP NFC / SCAN QR CODE</span>
+                                    <span class="font-mono text-blue-400">★★★★★ Bintang 5</span>
+                                </div>
+                            </div>
+
+                            <!-- CARD BACK SIDE -->
+                            <div id="card-back-view" class="card-back absolute inset-0 p-6 flex flex-col justify-between bg-slate-950 text-slate-300">
+                                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                                    <span class="text-xs font-bold text-white">Panduan Penggunaan</span>
+                                    <i class="fa-solid fa-wifi text-blue-400 rotate-90"></i>
+                                </div>
+                                <div class="space-y-2 text-xs py-2">
+                                    <p class="flex items-start gap-2">
+                                        <span class="font-bold text-blue-400">1.</span> Tempelkan bagian belakang HP ke kartu ini (NFC Aktif)
+                                    </p>
+                                    <p class="flex items-start gap-2">
+                                        <span class="font-bold text-blue-400">2.</span> Atau Buka Kamera HP lalu scan QR Code di sisi depan
+                                    </p>
+                                    <p class="flex items-start gap-2">
+                                        <span class="font-bold text-blue-400">3.</span> Pilih Bintang 5 & tulis pengalaman terbaik Anda
+                                    </p>
+                                </div>
+                                <div class="text-[10px] text-center text-slate-500 border-t border-slate-800 pt-2">
+                                    Terima kasih telah mendukung bisnis lokal kami!
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: ACTIVATED CARDS REGISTRY & SAVED HISTORY -->
+        <section id="tab-history" class="space-y-8 hidden">
+            <div class="glass-card rounded-2xl p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-id-card text-emerald-400"></i> Registri Kartu Teraktivasi
+                        </h3>
+                        <p class="text-xs text-slate-400">Daftar kartu NFC & QR yang telah di-bind dengan ID Unik dan Bisnis Anda.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <input type="text" id="search-history-input" oninput="filterCardRegistry()" placeholder="Cari ID Kartu / Bisnis..." class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <button onclick="clearHistory()" class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-medium rounded-xl transition-all shrink-0">
+                            <i class="fa-solid fa-trash mr-1"></i> Hapus Semua
+                        </button>
+                    </div>
+                </div>
+
+                <div id="history-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamic Registry Items Rendered Here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-950 py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-2">
+            <p>TapReview Studio - Generator Kartu NFC & QR Google Review Siap Pakai.</p>
+            <p class="text-slate-600">Dapat di-deploy langsung ke Vercel / Netlify tanpa server backend (100% Client-Side Web NFC & Camera API).</p>
+        </div>
+    </footer>
+
+    <script>
+        // Global App State
+        let currentBusiness = {
+            name: "Kopi Kenangan Studio",
+            subtext: "Bantu Kami Tumbuh! Tap Kartu / Scan QR untuk Beri Ulasan",
+            placeId: "ChIJN1t_tDe1xS0RyA3hX431x4s",
+            url: "https://search.google.com/local/writereview?placeid=ChIJN1t_tDe1xS0RyA3hX431x4s",
+            theme: "modern-dark"
+        };
+
+        let currentCardId = null;
+        let html5QrScanner = null;
+
+        // Dictionary & Parser to auto-detect business name from Place ID or Google Maps URL
+        const placeIdToNameMap = {
+            'ChIJN1t_tDe1xS0RyA3hX431x4s': 'Kopi Kenangan Studio',
+            'ChIJ3Xm8qO3xaS4RDs434mX-f30': 'Kopi Kenangan - Senayan',
+            'ChIJu3S-a3X2aI4R93e32b4-X99': 'Restoran Sederhana Padang',
+            'ChIJX99834v3aI4Rf44f2b9-A11': 'Barberking Gentleman Haircut'
+        };
+
+        function autoDetectBusinessName(inputStr) {
+            if (!inputStr) return null;
+            const trimmed = inputStr.trim();
+
+            if (placeIdToNameMap[trimmed]) {
+                return placeIdToNameMap[trimmed];
+            }
+
+            const history = JSON.parse(localStorage.getItem('tapreview_history') || '[]');
+            const historyMatch = history.find(item => item.placeId === trimmed || (item.url && item.url.includes(trimmed)));
+            if (historyMatch && historyMatch.name) {
+                return historyMatch.name;
+            }
+
+            if (trimmed.includes('google.com') || trimmed.includes('goo.gl') || trimmed.includes('maps')) {
+                try {
+                    let match = trimmed.match(/\/maps\/place\/([^\/@?#]+)/);
+                    if (match && match[1]) {
+                        let rawName = decodeURIComponent(match[1].replace(/\+/g, ' '));
+                        if (rawName && rawName.length > 1) return cleanBusinessName(rawName);
+                    }
+
+                    match = trimmed.match(/\/maps\/search\/([^\/@?#]+)/);
+                    if (match && match[1]) {
+                        let rawName = decodeURIComponent(match[1].replace(/\+/g, ' '));
+                        if (rawName && rawName.length > 1) return cleanBusinessName(rawName);
+                    }
+
+                    const urlObj = new URL(trimmed.startsWith('http') ? trimmed : 'https://' + trimmed);
+                    const qParam = urlObj.searchParams.get('q') || urlObj.searchParams.get('query');
+                    if (qParam) {
+                        return cleanBusinessName(decodeURIComponent(qParam.replace(/\+/g, ' ')));
+                    }
+                } catch(e) {
+                    console.error("Failed to parse business name from URL", e);
+                }
+            }
+
+            return null;
+        }
+
+        function cleanBusinessName(str) {
+            if (!str) return '';
+            return str.replace(/@[-0-9.,]+/, '').replace(/,.*$/, '').trim();
+        }
+
+        function setScanMode(mode) {
+            ['nfc', 'qr', 'manual'].forEach(m => {
+                const view = document.getElementById(`scanner-view-${m}`);
+                const btn = document.getElementById(`scan-mode-${m}`);
+                if (!view || !btn) return;
+
+                if (m === mode) {
+                    view.classList.remove('hidden');
+                    btn.className = "p-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-semibold transition-all text-center flex flex-col items-center gap-1";
+                } else {
+                    view.classList.add('hidden');
+                    btn.className = "p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 text-xs font-semibold transition-all text-center flex flex-col items-center gap-1 hover:text-white";
+                }
+            });
+
+            if (mode !== 'qr') {
+                stopQrScanner();
+            }
+        }
+
+        function startQrScanner() {
+            const qrRegion = document.getElementById('qr-camera-reader');
+            if (!qrRegion) return;
+
+            if (html5QrScanner) {
+                stopQrScanner();
+            }
+
+            html5QrScanner = new Html5Qrcode("qr-camera-reader");
+            html5QrScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 200, height: 200 } },
+                (decodedText, decodedResult) => {
+                    handleCardScanSuccess(decodedText, 'QR Scanner');
+                    stopQrScanner();
+                },
+                (errorMessage) => {
+                    // Scanning...
+                }
+            ).catch(err => {
+                showToast("Tidak dapat mengakses kamera: " + (err.message || err), "error");
+            });
+        }
+
+        function stopQrScanner() {
+            if (html5QrScanner) {
+                html5QrScanner.stop().then(() => {
+                    html5QrScanner.clear();
+                    html5QrScanner = null;
+                }).catch(err => {
+                    html5QrScanner = null;
+                });
+            }
+        }
+
+        function handleCardScanSuccess(rawResult, sourceName) {
+            let extractedId = rawResult.trim();
+            
+            // If result is a full URL, try extracting unique parameter or generating a hash ID
+            if (extractedId.startsWith('http://') || extractedId.startsWith('https://')) {
+                try {
+                    const parsedUrl = new URL(extractedId);
+                    const placeId = parsedUrl.searchParams.get('placeid');
+                    if (placeId) {
+                        extractedId = 'CARD-PID-' + placeId.substring(0, 10).toUpperCase();
+                    } else {
+                        extractedId = 'CARD-URL-' + Math.abs(hashCode(extractedId)).toString(16).toUpperCase();
+                    }
+                } catch(e) {
+                    extractedId = 'CARD-' + extractedId.substring(0, 12).toUpperCase();
+                }
+            }
+
+            setDetectedCardId(extractedId, sourceName);
+        }
+
+        function hashCode(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                let character = str.charCodeAt(i);
+                hash = (hash << 5) - hash + character;
+                hash |= 0;
+            }
+            return hash;
+        }
+
+        function generateRandomCardId() {
+            const randomHex = Array.from({length: 4}, () => Math.floor(Math.random()*256).toString(16).padStart(2, '0')).join(':').toUpperCase();
+            const cardId = `UID-${randomHex}`;
+            setDetectedCardId(cardId, 'Acak ID Generator');
+        }
+
+        function applyManualCardId() {
+            const inputVal = document.getElementById('input-manual-card-id').value.trim();
+            if (!inputVal) {
+                showToast("Masukkan ID Kartu yang valid", "error");
+                return;
+            }
+            setDetectedCardId(inputVal, 'Manual Input');
+        }
+
+        function setDetectedCardId(cardId, source) {
+            currentCardId = cardId;
+            document.getElementById('display-card-id').innerText = cardId;
+            document.getElementById('summary-card-id').innerText = cardId;
+            
+            const badge = document.getElementById('card-status-badge');
+            if (badge) {
+                badge.className = "px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse";
+                badge.innerHTML = `<i class="fa-solid fa-check mr-1"></i> ID Terdeteksi (${source})`;
+            }
+
+            // Check if card ID already exists in registry
+            const registry = JSON.parse(localStorage.getItem('tapreview_history') || '[]');
+            const existing = registry.find(item => item.cardId === cardId);
+
+            const summaryStatus = document.getElementById('summary-card-status');
+            if (existing) {
+                summaryStatus.innerText = `Sudah Teraktivasi (${existing.name})`;
+                summaryStatus.className = "text-blue-400 font-semibold";
+                showToast(`ID Kartu ${cardId} pernah teraktivasi untuk '${existing.name}'`, "info");
+            } else {
+                summaryStatus.innerText = "Siap Diaktivasi";
+                summaryStatus.className = "text-emerald-400 font-semibold";
+                showToast(`ID Kartu Terdeteksi: ${cardId}`, "success");
+            }
+        }
+
+        async function scanNfcUid() {
+            if (!('NDEFReader' in window)) {
+                showToast("Web NFC tidak didukung di browser ini. Gunakan Chrome Android atau opsi Scan QR/Manual.", "error");
+                return;
+            }
+
+            try {
+                showToast("Dekatkan kartu NFC ke HP untuk membaca Hardware UID...", "info");
+                const ndef = new NDEFReader();
+                await ndef.scan();
+
+                ndef.addEventListener("reading", ({ message, serialNumber }) => {
+                    let uid = serialNumber ? serialNumber.toUpperCase() : null;
+                    if (!uid && message.records.length > 0) {
+                        for (const record of message.records) {
+                            if (record.recordType === "url") {
+                                const textDecoder = new TextDecoder();
+                                const url = textDecoder.decode(record.data);
+                                uid = 'NFC-TAG-' + Math.abs(hashCode(url)).toString(16).toUpperCase();
+                            }
+                        }
+                    }
+                    if (!uid) {
+                        uid = 'NFC-TAG-' + Math.floor(100000 + Math.random() * 900000);
+                    }
+
+                    setDetectedCardId(uid, 'NFC Hardware Tap');
+                });
+            } catch (error) {
+                console.error("NFC Scan Error:", error);
+                showToast("Gagal membaca NFC: " + (error.message || "Izin ditolak"), "error");
+            }
+        }
+
+        async function executeCardActivation() {
+            if (!currentCardId) {
+                showToast("Silakan Pindai / Ambil ID Kartu terlebih dahulu di Langkah 1!", "error");
+                return;
+            }
+
+            const bizName = currentBusiness.name;
+            const bizUrl = currentBusiness.url;
+
+            showToast("Memproses Aktivasi Kartu...", "info");
+
+            // Attempt writing payload to NFC tag if available
+            if ('NDEFReader' in window) {
+                try {
+                    const ndef = new NDEFReader();
+                    await ndef.write({
+                        records: [{ recordType: "url", data: bizUrl }]
+                    });
+                    showToast("Link Google Review berhasil dituliskan ke Chip NFC!", "success");
+                } catch(e) {
+                    console.log("NFC write skipped or failed:", e);
+                }
+            }
+
+            // Register into Local Database / History
+            const registryRecord = {
+                cardId: currentCardId,
+                name: bizName,
+                url: bizUrl,
+                placeId: currentBusiness.placeId || '',
+                date: new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                status: 'Aktif'
+            };
+
+            saveToRegistry(registryRecord);
+
+            showToast(`SUKSES! Kartu [${currentCardId}] Resmi Teraktivasi untuk '${bizName}'!`, "success");
+            
+            // Redirect to registry tab after 1s
+            setTimeout(() => {
+                switchTab('history');
+            }, 1200);
+        }
+
+        function saveToRegistry(record) {
+            let registry = JSON.parse(localStorage.getItem('tapreview_history') || '[]');
+            // Replace if cardId exists or unshift new
+            const index = registry.findIndex(item => item.cardId === record.cardId);
+            if (index >= 0) {
+                registry[index] = record;
+            } else {
+                registry.unshift(record);
+            }
+            localStorage.setItem('tapreview_history', JSON.stringify(registry));
+            loadSavedRegistry();
+        }
+
+        function loadSavedRegistry() {
+            const listEl = document.getElementById('history-list');
+            const registry = JSON.parse(localStorage.getItem('tapreview_history') || '[]');
+
+            if (registry.length === 0) {
+                listEl.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500 text-sm glass-card rounded-2xl">
+                        <i class="fa-solid fa-id-card text-3xl text-slate-600 mb-2 block"></i>
+                        Belum ada kartu teraktivasi. Lakukan aktivasi pertama Anda di tab 'Scan ID & Aktivasi'.
+                    </div>`;
+                return;
+            }
+
+            renderRegistryItems(registry);
+        }
+
+        function renderRegistryItems(items) {
+            const listEl = document.getElementById('history-list');
+            listEl.innerHTML = items.map((item) => `
+                <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between hover:border-emerald-500/40 transition-all">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                ID: ${item.cardId || 'TANPA-ID'}
+                            </span>
+                            <span class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-circle text-[8px]"></i> ${item.status || 'Aktif'}
+                            </span>
+                        </div>
+                        <div class="text-sm font-bold text-white truncate">${item.name}</div>
+                        <div class="text-xs font-mono text-blue-400 truncate mt-1">${item.url}</div>
+                        <div class="text-[10px] text-slate-500 mt-2">Diaktivasi: ${item.date}</div>
+                    </div>
+                    <div class="flex gap-2 mt-4 pt-3 border-t border-slate-900">
+                        <button onclick="loadFromRegistry('${encodeURIComponent(JSON.stringify(item))}')" class="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-xs rounded-lg transition-all w-full font-medium">
+                            Gunakan Profil
+                        </button>
+                        <a href="${item.url}" target="_blank" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-all flex items-center justify-center">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterCardRegistry() {
+            const query = document.getElementById('search-history-input').value.toLowerCase().trim();
+            const registry = JSON.parse(localStorage.getItem('tapreview_history') || '[]');
+
+            if (!query) {
+                renderRegistryItems(registry);
+                return;
+            }
+
+            const filtered = registry.filter(item => 
+                (item.cardId && item.cardId.toLowerCase().includes(query)) ||
+                (item.name && item.name.toLowerCase().includes(query)) ||
+                (item.url && item.url.toLowerCase().includes(query))
+            );
+
+            renderRegistryItems(filtered);
+        }
+
+        function loadFromRegistry(encodedData) {
+            const item = JSON.parse(decodeURIComponent(encodedData));
+            document.getElementById('biz-name').value = item.name;
+            currentBusiness.name = item.name;
+            currentBusiness.url = item.url;
+            
+            if (item.cardId) {
+                setDetectedCardId(item.cardId, 'Registry');
+            }
+
+            updateGeneratedUrl(item.url);
+            updateCardPreview();
+            syncActivationPanel();
+            switchTab('activate-card');
+            showToast(`Bisnis & ID Kartu '${item.name}' dimuat`, "success");
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('tapreview_history');
+            loadSavedRegistry();
+            showToast("Registri kartu berhasil dihapus", "info");
+        }
+
+        async function searchBusinessOnline() {
+            const query = document.getElementById('input-search-biz').value.trim();
+            const resultsBox = document.getElementById('search-results-box');
+            
+            if (!query) {
+                showToast("Ketikkan nama bisnis atau lokasi yang ingin dicari", "error");
+                return;
+            }
+
+            resultsBox.classList.remove('hidden');
+            resultsBox.innerHTML = `
+                <div class="p-3 text-center text-xs text-blue-400 bg-slate-950/80 rounded-xl border border-slate-800">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Mencari '${query}'...
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+                const data = await response.json();
+
+                if (!data || data.length === 0) {
+                    resultsBox.innerHTML = `
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs flex justify-between items-center">
+                            <div>
+                                <div class="font-bold text-white">${query}</div>
+                                <div class="text-slate-400 text-[11px]">Gunakan nama ini langsung</div>
+                            </div>
+                            <button onclick="applyBusinessData('${query.replace(/'/g, "\\'")}', '', '')" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs">Pilih</button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                resultsBox.innerHTML = data.map(item => {
+                    const displayName = item.name || item.display_name.split(',')[0];
+                    const address = item.display_name;
+                    return `
+                        <button onclick="applyBusinessData('${displayName.replace(/'/g, "\\'")}', '${item.osm_id || ''}', '${address.replace(/'/g, "\\'")}')" class="w-full text-left p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-blue-500/50 transition-all group flex justify-between items-center">
+                            <div class="truncate pr-2">
+                                <div class="text-xs font-bold text-white group-hover:text-blue-400 truncate">${displayName}</div>
+                                <div class="text-[10px] text-slate-400 truncate">${address}</div>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-blue-400 shrink-0"></i>
+                        </button>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                console.error("Search failed:", err);
+                resultsBox.innerHTML = `
+                    <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs flex justify-between items-center">
+                        <div>
+                            <div class="font-bold text-white">${query}</div>
+                            <div class="text-slate-400 text-[11px]">Gunakan nama ini langsung</div>
+                        </div>
+                        <button onclick="applyBusinessData('${query.replace(/'/g, "\\'")}', '', '')" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs">Pilih</button>
+                    </div>
+                `;
+            }
+        }
+
+        function applyBusinessData(name, id, address) {
+            document.getElementById('biz-name').value = name;
+            currentBusiness.name = name;
+            
+            const reviewUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
+            currentBusiness.url = reviewUrl;
+
+            updateGeneratedUrl(reviewUrl);
+            updateCardPreview();
+            syncActivationPanel();
+
+            triggerAutoSyncBadge(name);
+            showToast(`Berhasil Sync: '${name}'!`, "success");
+        }
+
+        function syncActivationPanel() {
+            document.getElementById('activation-biz-name').value = currentBusiness.name;
+            document.getElementById('activation-biz-url').value = currentBusiness.url;
+            document.getElementById('summary-biz-name').innerText = currentBusiness.name;
+        }
+
+        function triggerAutoSyncBadge(detectedName) {
+            const badge = document.getElementById('auto-sync-badge');
+            if (badge) {
+                badge.className = "text-[10px] text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/40 animate-pulse flex items-center gap-1";
+                badge.innerHTML = `<i class="fa-solid fa-check text-[9px]"></i> Synced: ${detectedName}`;
+                setTimeout(() => {
+                    badge.className = "text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 flex items-center gap-1";
+                    badge.innerHTML = `<i class="fa-solid fa-sync text-[9px]"></i> Auto-Sync Active`;
+                }, 3000);
+            }
+        }
+
+        function handlePlaceIdInput(val) {
+            const placeId = val.trim();
+            if (!placeId) return;
+
+            const detectedName = autoDetectBusinessName(placeId);
+            if (detectedName) {
+                document.getElementById('biz-name').value = detectedName;
+                currentBusiness.name = detectedName;
+                updateCardPreview();
+                syncActivationPanel();
+                triggerAutoSyncBadge(detectedName);
+            }
+        }
+
+        function handleUrlInput(val) {
+            const url = val.trim();
+            if (!url) return;
+
+            const detectedName = autoDetectBusinessName(url);
+            if (detectedName) {
+                document.getElementById('biz-name').value = detectedName;
+                currentBusiness.name = detectedName;
+                updateCardPreview();
+                syncActivationPanel();
+                triggerAutoSyncBadge(detectedName);
+            }
+        }
+
+        let qrcodeObj = null;
+        let cardQrCodeObj = null;
+
+        // Tab Switcher Logic
+        function switchTab(tabName) {
+            const tabs = ['activate-card', 'generator', 'nfc', 'designer', 'history'];
+            tabs.forEach(tab => {
+                const section = document.getElementById(`tab-${tab}`);
+                const navBtn = document.getElementById(`nav-${tab}`);
+                if (!section || !navBtn) return;
+
+                if (tab === tabName) {
+                    section.classList.remove('hidden');
+                    if (tab === 'activate-card') {
+                        navBtn.className = "px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 whitespace-nowrap";
+                    } else {
+                        navBtn.className = "px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-blue-400 bg-blue-500/10 border border-blue-500/30 whitespace-nowrap";
+                    }
+                } else {
+                    section.classList.add('hidden');
+                    navBtn.className = "px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white hover:bg-slate-800 whitespace-nowrap";
+                }
+            });
+
+            if (tabName !== 'activate-card') {
+                stopQrScanner();
+            }
+
+            if (tabName === 'designer' || tabName === 'generator') {
+                generateQrCode();
+            }
+
+            syncActivationPanel();
+        }
+
+        // Method Selector in Tab 1
+        function setMethod(method) {
+            ['search', 'placeid', 'url', 'sample'].forEach(m => {
+                const form = document.getElementById(`form-${m}`);
+                const btn = document.getElementById(`method-${m}`);
+                if (!form || !btn) return;
+                if (m === method) {
+                    form.classList.remove('hidden');
+                    btn.className = "px-4 py-2 border-b-2 border-blue-500 text-blue-400 text-sm font-medium transition-all whitespace-nowrap";
+                } else {
+                    form.classList.add('hidden');
+                    btn.className = "px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 text-sm font-medium transition-all whitespace-nowrap";
+                }
+            });
+        }
+
+        // Process Google Place ID
+        function generateFromPlaceId() {
+            const placeId = document.getElementById('input-placeid').value.trim();
+            if (!placeId) {
+                showToast("Silakan masukkan Google Place ID yang valid", "error");
+                return;
+            }
+            const reviewUrl = `https://search.google.com/local/writereview?placeid=${placeId}`;
+            currentBusiness.placeId = placeId;
+            currentBusiness.url = reviewUrl;
+
+            const detectedName = autoDetectBusinessName(placeId);
+            if (detectedName) {
+                currentBusiness.name = detectedName;
+                document.getElementById('biz-name').value = detectedName;
+            }
+            
+            updateGeneratedUrl(reviewUrl);
+            updateCardPreview();
+            syncActivationPanel();
+            showToast(`Link Review & Nama Bisnis '${currentBusiness.name}' berhasil diperbarui!`, "success");
+        }
+
+        // Process Direct URL
+        function generateFromDirectUrl() {
+            const url = document.getElementById('input-direct-url').value.trim();
+            if (!url) {
+                showToast("Masukkan URL Google Maps / Review terlebih dahulu", "error");
+                return;
+            }
+            currentBusiness.url = url;
+
+            const detectedName = autoDetectBusinessName(url);
+            if (detectedName) {
+                currentBusiness.name = detectedName;
+                document.getElementById('biz-name').value = detectedName;
+            }
+
+            updateGeneratedUrl(url);
+            updateCardPreview();
+            syncActivationPanel();
+            showToast(`Link & Nama Bisnis '${currentBusiness.name}' berhasil diperbarui!`, "success");
+        }
+
+        // Load Predefined Sample Business
+        function loadSampleBusiness(name, placeId, shortName) {
+            document.getElementById('biz-name').value = name;
+            document.getElementById('input-placeid').value = placeId;
+            currentBusiness.name = name;
+            currentBusiness.placeId = placeId;
+            currentBusiness.url = `https://search.google.com/local/writereview?placeid=${placeId}`;
+
+            updateGeneratedUrl(currentBusiness.url);
+            updateCardPreview();
+            syncActivationPanel();
+            showToast(`Contoh bisnis '${shortName}' berhasil dimuat!`, "info");
+        }
+
+        // Update Central State & QR Codes
+        function updateGeneratedUrl(url) {
+            document.getElementById('final-review-url').value = url;
+            document.getElementById('btn-test-link').href = url;
+            document.getElementById('nfc-target-url').innerText = url;
+            syncActivationPanel();
+            generateQrCode();
+        }
+
+        // Initialize QR Codes
+        function initQrCodes() {
+            const qrBox = document.getElementById('qrcode-container');
+            const cardQrBox = document.getElementById('card-qr-container');
+            qrBox.innerHTML = '';
+            cardQrBox.innerHTML = '';
+
+            qrcodeObj = new QRCode(qrBox, {
+                text: currentBusiness.url,
+                width: 160,
+                height: 160,
+                colorDark: document.getElementById('qr-color-dark').value,
+                colorLight: document.getElementById('qr-color-light').value,
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            cardQrCodeObj = new QRCode(cardQrBox, {
+                text: currentBusiness.url,
+                width: 90,
+                height: 90,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        // Re-generate QR Code on customization change
+        function generateQrCode() {
+            const darkColor = document.getElementById('qr-color-dark').value;
+            const lightColor = document.getElementById('qr-color-light').value;
+            
+            document.getElementById('qr-color-dark-hex').innerText = darkColor;
+            document.getElementById('qr-color-light-hex').innerText = lightColor;
+
+            initQrCodes();
+        }
+
+        // Card Designer Updates
+        function updateCardPreview() {
+            const name = document.getElementById('biz-name').value || "Nama Bisnis Anda";
+            const subtext = document.getElementById('biz-subtext').value || "Bantu Kami Tumbuh dengan Ulasan";
+            
+            currentBusiness.name = name;
+            currentBusiness.subtext = subtext;
+
+            document.getElementById('preview-biz-name').innerText = name;
+            document.getElementById('preview-biz-subtext').innerText = subtext;
+
+            const starsEl = document.getElementById('preview-stars');
+            const showStars = document.getElementById('toggle-stars').checked;
+            if (showStars) {
+                starsEl.classList.remove('hidden');
+            } else {
+                starsEl.classList.add('hidden');
+            }
+
+            syncActivationPanel();
+        }
+
+        // Change Card Themes
+        function setTheme(themeName) {
+            const card = document.getElementById('card-front-view');
+            currentBusiness.theme = themeName;
+
+            if (themeName === 'modern-dark') {
+                card.className = "card-front absolute inset-0 p-6 flex flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-white";
+            } else if (themeName === 'google-white') {
+                card.className = "card-front absolute inset-0 p-6 flex flex-col justify-between bg-gradient-to-br from-white via-slate-50 to-blue-50 text-slate-900";
+            } else if (themeName === 'gold-luxury') {
+                card.className = "card-front absolute inset-0 p-6 flex flex-col justify-between bg-gradient-to-br from-amber-950 via-amber-900 to-black text-amber-100";
+            }
+        }
+
+        // Update Card Dimensions and Shape based on Selected Media Format
+        function updateCardLayout() {
+            const format = document.getElementById('select-format').value;
+            const cardEl = document.getElementById('printable-card');
+            if (!cardEl) return;
+
+            cardEl.classList.remove(
+                'w-[340px]', 'h-[215px]', 'sm:w-[400px]', 'sm:h-[250px]',
+                'w-[260px]', 'h-[380px]', 'sm:w-[300px]', 'sm:h-[440px]',
+                'w-[280px]', 'h-[280px]', 'sm:w-[320px]', 'sm:h-[320px]',
+                'rounded-2xl', 'rounded-full', 'rounded-3xl'
+            );
+
+            if (format === 'cr80') {
+                cardEl.classList.add('w-[340px]', 'h-[215px]', 'sm:w-[400px]', 'sm:h-[250px]', 'rounded-2xl');
+            } else if (format === 'standee') {
+                cardEl.classList.add('w-[260px]', 'h-[380px]', 'sm:w-[300px]', 'sm:h-[440px]', 'rounded-2xl');
+            } else if (format === 'sticker') {
+                cardEl.classList.add('w-[280px]', 'h-[280px]', 'sm:w-[320px]', 'sm:h-[320px]', 'rounded-full');
+            }
+        }
+
+        // Flip Card Preview
+        function flipCard() {
+            const cardInner = document.getElementById('printable-card');
+            cardInner.classList.toggle('flipped');
+        }
+
+        // Download QR Code image
+        function downloadQrCode() {
+            const img = document.querySelector('#qrcode-container img');
+            if (!img) return;
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `QR-GoogleReview-${currentBusiness.name.replace(/\s+/g, '_')}.png`;
+            a.click();
+            showToast("QR Code berhasil diunduh!", "success");
+        }
+
+        // Download Card PNG Mockup
+        function downloadCardImage() {
+            const cardEl = document.getElementById('printable-card');
+            showToast("Sedang mengekspor gambar kartu...", "info");
+            
+            html2canvas(cardEl, { scale: 3 }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Kartu-NFC-Review-${currentBusiness.name.replace(/\s+/g, '_')}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                showToast("Gambar kartu berhasil diunduh!", "success");
+            }).catch(err => {
+                showToast("Gagal merender gambar kartu", "error");
+            });
+        }
+
+        // Web NFC API Functions
+        function checkNfcSupport() {
+            const statusBox = document.getElementById('nfc-status-text');
+            if ('NDEFReader' in window) {
+                statusBox.innerHTML = "<span class='text-emerald-400 font-semibold'><i class='fa-solid fa-circle-check'></i> Web NFC Didukung!</span> Browser Anda siap menulis chip NFC secara langsung.";
+            } else {
+                statusBox.innerHTML = "<span class='text-amber-400 font-semibold'><i class='fa-solid fa-circle-info'></i> Web NFC tidak aktif / belum didukung di browser ini.</span> Fitur ini berfungsi penuh di Chrome Android. Jika di iPhone/Desktop, Anda dapat menyalin link ulasan lalu mengisinya lewat aplikasi NFC Tools.";
+            }
+        }
+
+        async function writeNfcTag() {
+            const urlToWrite = document.getElementById('final-review-url').value;
+            const indicator = document.getElementById('nfc-writing-indicator');
+
+            if (!('NDEFReader' in window)) {
+                showToast("Web NFC API tidak didukung di browser ini. Gunakan Chrome Android atau aplikasi NFC Tools di iOS.", "error");
+                return;
+            }
+
+            try {
+                indicator.classList.remove('hidden');
+                const reader = new NDEFReader();
+                await reader.write({
+                    records: [{ recordType: "url", data: urlToWrite }]
+                });
+
+                indicator.classList.add('hidden');
+                showToast("BERHASIL! Link Ulasan Google telah tertulis di Kartu NFC!", "success");
+            } catch (error) {
+                indicator.classList.add('hidden');
+                console.error("NFC Write Error:", error);
+                showToast("Gagal menulis ke NFC: " + (error.message || "Proses dibatalkan atau waktu habis"), "error");
+            }
+        }
+
+        async function readNfcTag() {
+            if (!('NDEFReader' in window)) {
+                showToast("Web NFC tidak didukung di browser ini.", "error");
+                return;
+            }
+
+            try {
+                showToast("Mendekatkan kartu NFC untuk membaca...", "info");
+                const reader = new NDEFReader();
+                await reader.scan();
+                
+                reader.addEventListener("reading", ({ message, serialNumber }) => {
+                    for (const record of message.records) {
+                        if (record.recordType === "url") {
+                            const textDecoder = new TextDecoder();
+                            const url = textDecoder.decode(record.data);
+                            showToast(`NFC Terbaca! Serial: ${serialNumber || 'N/A'} | URL: ${url}`, "success");
+                        }
+                    }
+                });
+            } catch (error) {
+                showToast("Gagal membaca NFC: " + error.message, "error");
+            }
+        }
+
+        function cancelNfc() {
+            document.getElementById('nfc-writing-indicator').classList.add('hidden');
+            showToast("Proses NFC dibatalkan", "info");
+        }
+
+        // Copy Helper
+        function copyToClipboard(text) {
+            const tempInput = document.createElement('input');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast("Link berhasil disalin ke clipboard!", "success");
+        }
+
+        // Custom Toast System
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-slate-800 text-white border-slate-700";
+            let icon = "fa-circle-info text-blue-400";
+
+            if (type === "success") {
+                bgClass = "bg-slate-900 text-white border-emerald-500/40 shadow-emerald-500/10";
+                icon = "fa-circle-check text-emerald-400";
+            } else if (type === "error") {
+                bgClass = "bg-slate-900 text-white border-red-500/40 shadow-red-500/10";
+                icon = "fa-triangle-exclamation text-red-400";
+            }
+
+            toast.className = `p-4 rounded-2xl border ${bgClass} shadow-xl flex items-center gap-3 transition-all transform translate-y-2 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icon} text-lg"></i>
+                <div class="text-xs font-medium">${message}</div>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Initialize application when DOM is loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            initQrCodes();
+            checkNfcSupport();
+            loadSavedRegistry();
+            updateCardPreview();
+            syncActivationPanel();
+            generateRandomCardId(); // Pre-populate a sample Card UID
+        });
+    </script>
+</body>
+</html>
